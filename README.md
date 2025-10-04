@@ -151,7 +151,7 @@ Isi file index.blade.php dengan kode lengkap berikut:
                                             Tidak ada data absensi untuk tanggal ini.
                                         </td>
                                     </tr>
-                                @endorselse
+                                @endforelse
                             </tbody>
                         </table>
                     </div>
