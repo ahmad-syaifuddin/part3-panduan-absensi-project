@@ -444,6 +444,30 @@ Menjadi:
     {{ __('Hari Libur') }}
 </x-nav-link>
 ```
+
+edit model holiday seperti ini :
+```php
+<?php
+
+namespace App\Models;
+
+use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Model;
+
+class Holiday extends Model
+{
+    use HasFactory;
+    protected $fillable = [
+        'date',
+        'description',
+    ];
+
+    protected $casts = [
+        'date' => 'date',
+    ];
+}
+
+```
 (Lakukan hal yang sama untuk <x-responsive-nav-link>)
 
 Uji Coba
