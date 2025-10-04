@@ -312,6 +312,7 @@ class HolidayController extends Controller
                          ->with('success', 'Hari libur berhasil dihapus.');
     }
 }
+```
 Langkah 35: Membuat View Hari Libur
 Selanjutnya, kita buat halaman untuk menampilkan daftar hari libur sekaligus formulir untuk menambahkannya.
 
@@ -321,7 +322,7 @@ Di dalam folder holidays, buat file baru bernama index.blade.php.
 
 Isi file tersebut dengan kode lengkap berikut:
 
-HTML
+```HTML
 
 <x-app-layout>
     <x-slot name="header">
