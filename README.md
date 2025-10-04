@@ -480,3 +480,7 @@ Coba tambahkan tanggal libur baru, misalnya "Hari Kemerdekaan".
 Tanggal yang baru ditambahkan akan muncul di tabel.
 
 Coba hapus data yang baru saja Anda buat.
+---
+
+### Next lanjut Part 4 untuk membuat Laporan Absensi harian untuk admin, CRUD (management) Hari Libur
+Untuk informasi lebih lanjut, kunjungi [Panduannya](https://github.com/ahmad-syaifuddin/part4-panduan-absensi-project.git).
