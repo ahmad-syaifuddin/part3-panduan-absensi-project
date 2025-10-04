@@ -482,5 +482,5 @@ Tanggal yang baru ditambahkan akan muncul di tabel.
 Coba hapus data yang baru saja Anda buat.
 ---
 
-### Next lanjut Part 4 untuk membuat Laporan Absensi harian untuk admin, CRUD (management) Hari Libur
+### Next lanjut Part 4 untuk Integrasi Hari Libur ke Logika Absensi, mengimplementasikan sistem auto-generate absensi (status "Alpa") untuk karyawan yang tidak melakukan absensi pada hari kerja. Ini akan melibatkan Scheduled Task atau Tugas Terjadwal.
 Untuk informasi lebih lanjut, kunjungi [Panduannya](https://github.com/ahmad-syaifuddin/part4-panduan-absensi-project.git).
