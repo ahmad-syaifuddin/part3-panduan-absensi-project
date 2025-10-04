@@ -4,7 +4,7 @@
 ### Setelah karyawan bisa absen, tugas admin adalah memonitor dan melihat laporannya. Kita akan membangun fitur Laporan Absensi Harian yang memungkinkan admin melihat data absensi semua karyawan dan memfilternya berdasarkan tanggal.
 
 ## Tahap 10: Membuat Laporan Absensi untuk Admin
-###Langkah 27: Membuat ReportController
+### Langkah 27: Membuat ReportController
 Kita buat controller baru yang khusus menangani semua hal terkait laporan agar kode tetap rapi.
 
 Jalankan perintah ini di terminal:
@@ -205,3 +205,253 @@ Gunakan filter tanggal untuk memilih tanggal lain (misalnya kemarin atau lusa) l
 Klik tombol "Reset" untuk kembali menampilkan data hari ini.
 
 Fitur laporan dasar untuk admin sekarang sudah selesai! Admin kini punya alat untuk memantau kehadiran karyawan setiap hari.
+
+---
+
+Sistem absensi perlu tahu kapan hari libur nasional atau cuti bersama agar tidak salah menandai karyawan sebagai "Alpa". Untuk itu, kita akan membuat fitur Manajemen Hari Libur di mana admin bisa menambahkan dan menghapus tanggal-tanggal libur.
+
+## Tahap 11: Membuat CRUD Manajemen Hari Libur
+Ini akan menjadi fitur CRUD yang lebih sederhana, karena kita hanya butuh fungsi index (melihat daftar), store (menyimpan), dan destroy (menghapus).
+
+### Langkah 32: Membuat HolidayController
+Kita buat controller baru untuk mengelola semua logika terkait hari libur.
+
+Jalankan perintah ini di terminal:
+
+```Bash
+php artisan make:controller HolidayController --resource
+```
+Meskipun kita tidak akan menggunakan semua method resource, ini cara cepat untuk membuat controller dengan struktur standar.
+
+### Langkah 33: Membuat Rute untuk Hari Libur
+Kita definisikan rute yang diperlukan di dalam grup rute khusus admin.
+
+Buka file routes/web.php.
+
+Tambahkan rute berikut di dalam grup middleware(['auth', 'role:admin']).
+
+```PHP
+// routes/web.php
+use App\Http\Controllers\HolidayController; // <-- Jangan lupa tambahkan ini
+
+// ...
+
+Route::middleware(['auth', 'role:admin'])->group(function () {
+    Route::resource('users', UserController::class);
+    Route::get('/reports', [ReportController::class, 'index'])->name('reports.index');
+
+    // RUTE UNTUK HARI LIBUR
+    Route::get('/holidays', [HolidayController::class, 'index'])->name('holidays.index');
+    Route::post('/holidays', [HolidayController::class, 'store'])->name('holidays.store');
+    Route::delete('/holidays/{holiday}', [HolidayController::class, 'destroy'])->name('holidays.destroy');
+});
+
+// ...
+```
+Perhatikan kita hanya mendefinisikan rute yang kita butuhkan: index (GET), store (POST), dan destroy (DELETE).
+
+Langkah 34: Implementasi Logika di HolidayController
+Sekarang, kita isi HolidayController dengan logika untuk menampilkan, menyimpan, dan menghapus data.
+
+Buka app/Http/Controllers/HolidayController.php.
+
+Ganti seluruh isinya dengan kode berikut:
+
+```PHP
+
+<?php
+
+namespace App\Http\Controllers;
+
+use App\Models\Holiday; // <-- Import model
+use Illuminate\Http\Request;
+
+class HolidayController extends Controller
+{
+    /**
+     * Display a listing of the resource.
+     */
+    public function index()
+    {
+        // Ambil semua data hari libur, urutkan berdasarkan tanggal
+        $holidays = Holiday::orderBy('date', 'desc')->paginate(10);
+
+        return view('holidays.index', compact('holidays'));
+    }
+
+    /**
+     * Store a newly created resource in storage.
+     */
+    public function store(Request $request)
+    {
+        // Validasi input
+        $request->validate([
+            'date' => ['required', 'date', 'unique:holidays,date'],
+            'description' => ['required', 'string', 'max:255'],
+        ]);
+
+        // Buat data baru
+        Holiday::create([
+            'date' => $request->date,
+            'description' => $request->description,
+        ]);
+
+        return redirect()->route('holidays.index')
+                         ->with('success', 'Hari libur berhasil ditambahkan.');
+    }
+
+    /**
+     * Remove the specified resource from storage.
+     */
+    public function destroy(Holiday $holiday)
+    {
+        // Hapus data
+        $holiday->delete();
+
+        return redirect()->route('holidays.index')
+                         ->with('success', 'Hari libur berhasil dihapus.');
+    }
+}
+Langkah 35: Membuat View Hari Libur
+Selanjutnya, kita buat halaman untuk menampilkan daftar hari libur sekaligus formulir untuk menambahkannya.
+
+Buat folder baru bernama holidays di dalam resources/views.
+
+Di dalam folder holidays, buat file baru bernama index.blade.php.
+
+Isi file tersebut dengan kode lengkap berikut:
+
+HTML
+
+<x-app-layout>
+    <x-slot name="header">
+        <h2 class="font-semibold text-xl text-gray-800 leading-tight">
+            {{ __('Manajemen Hari Libur') }}
+        </h2>
+    </x-slot>
+
+    <div class="py-12">
+        <div class="max-w-7xl mx-auto sm:px-6 lg:px-8 space-y-6">
+
+            <div class="p-4 sm:p-8 bg-white shadow sm:rounded-lg">
+                <div class="max-w-xl">
+                    <header>
+                        <h2 class="text-lg font-medium text-gray-900">
+                            {{ __('Tambah Hari Libur Baru') }}
+                        </h2>
+                        <p class="mt-1 text-sm text-gray-600">
+                            {{ __('Tambahkan tanggal libur nasional atau cuti bersama.') }}
+                        </p>
+                    </header>
+
+                    @if ($errors->any())
+                        <div class="mt-4 bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative" role="alert">
+                            <ul>
+                                @foreach ($errors->all() as $error)
+                                    <li>{{ $error }}</li>
+                                @endforeach
+                            </ul>
+                        </div>
+                    @endif
+
+                    <form method="post" action="{{ route('holidays.store') }}" class="mt-6 space-y-6">
+                        @csrf
+                        <div>
+                            <x-input-label for="date" :value="__('Tanggal')" />
+                            <x-text-input id="date" name="date" type="date" class="mt-1 block w-full" :value="old('date')" required />
+                        </div>
+                        <div>
+                            <x-input-label for="description" :value="__('Keterangan')" />
+                            <x-text-input id="description" name="description" type="text" class="mt-1 block w-full" :value="old('description')" required />
+                        </div>
+                        <div class="flex items-center gap-4">
+                            <x-primary-button>{{ __('Simpan') }}</x-primary-button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+
+            <div class="p-4 sm:p-8 bg-white shadow sm:rounded-lg">
+                @if (session('success'))
+                    <div class="mb-4 bg-green-100 border border-green-400 text-green-700 px-4 py-3 rounded relative" role="alert">
+                        {{ session('success') }}
+                    </div>
+                @endif
+
+                <h3 class="text-lg font-medium text-gray-900 mb-4">Daftar Hari Libur</h3>
+                <div class="overflow-x-auto">
+                    <table class="min-w-full divide-y divide-gray-200">
+                        <thead class="bg-gray-50">
+                            <tr>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Tanggal</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Keterangan</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Aksi</th>
+                            </tr>
+                        </thead>
+                        <tbody class="bg-white divide-y divide-gray-200">
+                            @forelse ($holidays as $holiday)
+                                <tr>
+                                    <td class="px-6 py-4 whitespace-nowrap">{{ \Carbon\Carbon::parse($holiday->date)->isoFormat('D MMMM Y') }}</td>
+                                    <td class="px-6 py-4 whitespace-nowrap">{{ $holiday->description }}</td>
+                                    <td class="px-6 py-4 whitespace-nowrap">
+                                        <form action="{{ route('holidays.destroy', $holiday->id) }}" method="POST" onsubmit="return confirm('Yakin ingin menghapus hari libur ini?');">
+                                            @csrf
+                                            @method('DELETE')
+                                            <button type="submit" class="text-red-600 hover:text-red-900">
+                                                <i class="fas fa-trash"></i> Hapus
+                                            </button>
+                                        </form>
+                                    </td>
+                                </tr>
+                            @empty
+                                <tr>
+                                    <td colspan="3" class="px-6 py-4 text-center text-gray-500">
+                                        Belum ada data hari libur.
+                                    </td>
+                                </tr>
+                            @endforelse
+                        </tbody>
+                    </table>
+                </div>
+                <div class="mt-4">
+                    {{ $holidays->links() }}
+                </div>
+            </div>
+        </div>
+    </div>
+</x-app-layout>
+```
+### Langkah 36: Mengaktifkan Link Navigasi Admin
+Langkah terakhir, aktifkan link "Hari Libur" di menu navigasi.
+
+Buka resources/views/layouts/navigation.blade.php.
+
+Cari link "Hari Libur" dan aktifkan rutenya.
+
+Ubah ini (desktop & mobile):
+
+```HTML
+<x-nav-link :href="'#'" {{-- :href="route('holidays.index')" :active="request()->routeIs('holidays.*')" --}}>
+    {{ __('Hari Libur') }}
+</x-nav-link>
+```
+Menjadi:
+
+```HTML
+
+<x-nav-link :href="route('holidays.index')" :active="request()->routeIs('holidays.*')">
+    {{ __('Hari Libur') }}
+</x-nav-link>
+```
+(Lakukan hal yang sama untuk <x-responsive-nav-link>)
+
+Uji Coba
+Login sebagai admin.
+
+Klik menu "Hari Libur". Anda akan diarahkan ke halaman manajemen hari libur.
+
+Coba tambahkan tanggal libur baru, misalnya "Hari Kemerdekaan".
+
+Tanggal yang baru ditambahkan akan muncul di tabel.
+
+Coba hapus data yang baru saja Anda buat.
