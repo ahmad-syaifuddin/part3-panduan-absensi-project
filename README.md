@@ -800,12 +800,12 @@ Export laporan ke PDF/Excel untuk sisi admin.
 
 Laporan bulanan dan rekapitulasi.
 
-Sistem pengajuan cuti.
+Sistem pengajuan cuti (Opsional).
 
-Notifikasi via email atau WhatsApp.
+Notifikasi via email, WhatsApp (jika ada budget), dan Telegram.
 
 Teruslah belajar dan bereksperimen. Good luck!
 
 ---
 
-### Next lanjut Part 4 untuk [Panduannya](https://github.com/ahmad-syaifuddin/part4-panduan-absensi-project.git).
+### Next lanjut Part 4 untuk Export Data Laporan Ke PDF/Excel untuk sisi admin & Laporan Bulanan dan Rekapitulasi [Panduannya](https://github.com/ahmad-syaifuddin/part4-panduan-absensi-project.git).
