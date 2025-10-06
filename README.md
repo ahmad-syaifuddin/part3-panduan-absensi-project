@@ -1,3 +1,10 @@
+<div align="center">
+
+<p> <b>Visitors Count 👁️</b> </p>
+<img src="https://profile-counter.deno.dev/part3-panduan-absensi-project/count.svg" alt="Profile Counter Repo :: Visitor's Count" />
+
+</div>
+
 # Part3 panduan absensi project
 
 ## saatnya kembali ke "markas" admin! 👮
