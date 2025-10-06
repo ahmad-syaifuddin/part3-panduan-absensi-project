@@ -223,5 +223,4 @@ Pastikan data yang muncul di tabel sudah sesuai dengan tanggal yang Anda pilih d
 
 ---
 
-### Next lanjut Part 4 untuk Integrasi Hari Libur ke Logika Absensi, mengimplementasikan sistem auto-generate absensi (status "Alpa") untuk karyawan yang tidak melakukan absensi pada hari kerja. Ini akan melibatkan Scheduled Task atau Tugas Terjadwal.
-Untuk informasi lebih lanjut, kunjungi [Panduannya](https://github.com/ahmad-syaifuddin/part4-panduan-absensi-project.git).
+### Next lanjut Part 4 untuk [Panduannya](https://github.com/ahmad-syaifuddin/part4-panduan-absensi-project.git).
