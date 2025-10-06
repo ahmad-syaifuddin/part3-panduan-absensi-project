@@ -10,88 +10,91 @@
 ## saatnya kembali ke "markas" admin! 👮
 ### Setelah karyawan bisa absen, tugas admin adalah memonitor dan melihat laporannya. Kita akan membangun fitur Laporan Absensi Harian yang memungkinkan admin melihat data absensi semua karyawan dan memfilternya berdasarkan tanggal.
 
-## Tahap 10: Membuat Laporan Absensi untuk Admin
-### Langkah 27: Membuat ReportController
-Kita buat controller baru yang khusus menangani semua hal terkait laporan agar kode tetap rapi.
+## Tahap 10: Membuat Laporan Absensi Harian (Admin)
+🎯 Tujuan:
+Membuat halaman laporan yang menampilkan tabel absensi harian semua karyawan, lengkap dengan filter tanggal.
 
-Jalankan perintah ini di terminal:
+Langkah 1: Membuat Controller Baru untuk Laporan
+Agar kode tetap rapi dan tidak menumpuk di AttendanceController, kita akan buat Controller baru yang khusus menangani laporan untuk admin.
+
+Jalankan perintah ini di terminal Anda:
 
 ```Bash
-php artisan make:controller ReportController
+php artisan make:controller Admin/ReportController
 ```
-
-### Langkah 28: Membuat Rute untuk Halaman Laporan
-Selanjutnya, kita definisikan "alamat" untuk halaman laporan di dalam grup rute khusus admin.
-
-Buka file routes/web.php.
-
-Tambahkan rute berikut di dalam grup middleware(['auth', 'role:admin']).
+Sekarang, buka file yang baru dibuat di app/Http/Controllers/Admin/ReportController.php dan isi dengan logika berikut:
 
 ```PHP
-// routes/web.php
-use App\Http\Controllers\ReportController; // <-- Jangan lupa tambahkan ini
-// ...
-Route::middleware(['auth', 'role:admin'])->group(function () {
-    Route::resource('users', UserController::class);
-    // RUTE UNTUK LAPORAN
-    Route::get('/reports', [ReportController::class, 'index'])->name('reports.index'); // <-- TAMBAHKAN INI
-});
-
-// ...
-```
-### Langkah 29: Implementasi Logika Laporan di Controller
-Sekarang kita isi "otak" dari fitur laporan di ReportController. Logika ini akan mengambil data absensi dan menangani filter tanggal.
-
-Buka app/Http/Controllers/ReportController.php.
-
-Isi dengan kode berikut:
-
-```PHP
-
 <?php
 
-namespace App\Http\Controllers;
+namespace App\Http\Controllers\Admin;
 
+use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
-use App\Models\Attendance; // <-- Import model
-use Carbon\Carbon;          // <-- Import Carbon
+use App\Models\Attendance;
+use Carbon\Carbon;
 
 class ReportController extends Controller
 {
-    public function index(Request $request)
+    /**
+     * Menampilkan halaman laporan absensi harian.
+     */
+    public function dailyReport(Request $request)
     {
-        // Tentukan tanggal filter: dari input request atau default hari ini
-        $filterDate = $request->input('date', Carbon::now('Asia/Makassar')->format('Y-m-d'));
+        // Tentukan tanggal. Jika ada input dari user, gunakan itu. Jika tidak, gunakan hari ini.
+        $date = $request->input('date') ? Carbon::parse($request->input('date')) : Carbon::now('Asia/Makassar');
 
-        // Query data absensi
-        $attendances = Attendance::with(['employee.user']) // Eager loading relasi bertingkat
-                                 ->where('date', $filterDate)
-                                 ->latest()
-                                 ->paginate(15);
+        // Ambil data absensi pada tanggal yang dipilih
+        // Kita gunakan 'with' untuk mengambil data relasi 'employee' agar lebih efisien (Eager Loading)
+        $attendances = Attendance::with('employee')
+                                ->whereDate('date', $date)
+                                ->orderBy('created_at', 'desc')
+                                ->get();
 
         // Kirim data ke view
-        return view('reports.index', compact('attendances', 'filterDate'));
+        return view('admin.reports.daily', [
+            'attendances' => $attendances,
+            'selectedDate' => $date->format('Y-m-d'), // Kirim tanggal yang dipilih ke view
+        ]);
     }
 }
 ```
-Penjelasan Kode:
+Langkah 2: Membuat Rute Baru
+Selanjutnya, kita buat alamat URL untuk mengakses halaman laporan ini.
 
-Request $request: Kita butuh ini untuk menangkap input filter dari pengguna.
+Buka file routes/web.php dan tambahkan rute baru ini. Pastikan rute ini hanya bisa diakses oleh admin.
 
-$request->input('date', ...): Mengambil nilai dari input form dengan nama date. Jika tidak ada, maka akan menggunakan tanggal hari ini sebagai nilai default.
+```PHP
+// routes/web.php
+use App\Http\Controllers\Admin\ReportController;
 
-with(['employee.user']): Ini adalah nested eager loading. Kita memberitahu Eloquent: "Ambil semua data Attendance, sertakan juga data employee yang terhubung, DAN sertakan juga data user yang terhubung dengan employee tersebut." Ini sangat efisien untuk menampilkan nama karyawan dari tabel users.
+// ... rute lainnya
 
-Langkah 30: Membuat View Laporan
-Kini kita buat halaman untuk menampilkan filter dan tabel laporannya.
+// Grup Rute untuk Admin
+Route::middleware(['auth'])->group(function () { 
+    // ... rute admin yang sudah ada ...
+    Route::post('/admin/attendance/mark-alpa', [AttendanceController::class, 'markAlpa'])
+            ->name('admin.attendance.mark_alpa');
 
-Buat folder baru bernama reports di dalam resources/views.
+    // RUTE BARU UNTUK LAPORAN HARIAN
+    Route::get('/admin/reports/daily', [ReportController::class, 'dailyReport'])
+            ->name('admin.reports.daily');
+});
+```
 
-Di dalam folder reports, buat file baru bernama index.blade.php.
+Langkah 3: Membuat View untuk Laporan
+Sekarang kita buat tampilannya.
 
-Isi file index.blade.php dengan kode lengkap berikut:
+Buat folder baru: resources/views/admin.
 
-```HTML
+Di dalam admin, buat folder lagi: reports.
+
+Di dalam reports, buat file baru bernama daily.blade.php.
+
+Isi file daily.blade.php dengan kode berikut:
+
+```Blade
+
 <x-app-layout>
     <x-slot name="header">
         <h2 class="font-semibold text-xl text-gray-800 leading-tight">
@@ -104,58 +107,64 @@ Isi file index.blade.php dengan kode lengkap berikut:
             <div class="bg-white overflow-hidden shadow-sm sm:rounded-lg">
                 <div class="p-6 text-gray-900">
 
-                    <form method="GET" action="{{ route('reports.index') }}">
-                        <div class="flex items-center space-x-4 mb-6">
-                            <div>
-                                <x-input-label for="date" :value="__('Pilih Tanggal')" />
-                                <x-text-input id="date" type="date" name="date" :value="$filterDate" />
+                    {{-- Filter Tanggal --}}
+                    <div class="mb-6">
+                        <form method="GET" action="{{ route('admin.reports.daily') }}">
+                            <div class="flex items-center space-x-4">
+                                <div>
+                                    <label for="date" class="block text-sm font-medium text-gray-700">Pilih Tanggal:</label>
+                                    <input type="date" name="date" id="date" value="{{ $selectedDate }}" class="mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm rounded-md">
+                                </div>
+                                <div class="pt-5">
+                                    <button type="submit" class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-indigo-600 hover:bg-indigo-700">
+                                        Tampilkan Laporan
+                                    </button>
+                                </div>
                             </div>
-                            <div class="pt-6">
-                                <x-primary-button>
-                                    <i class="fas fa-filter mr-2"></i> Filter
-                                </x-primary-button>
-                                <a href="{{ route('reports.index') }}" class="ml-2 inline-flex items-center px-4 py-2 bg-gray-300 border border-transparent rounded-md font-semibold text-xs text-gray-700 uppercase tracking-widest hover:bg-gray-400 focus:outline-none focus:border-gray-900 focus:ring ring-gray-300 disabled:opacity-25 transition ease-in-out duration-150">
-                                    Reset
-                                </a>
-                            </div>
-                        </div>
-                    </form>
+                        </form>
+                    </div>
 
+                    {{-- Tabel Laporan --}}
                     <div class="overflow-x-auto">
                         <table class="min-w-full divide-y divide-gray-200">
                             <thead class="bg-gray-50">
                                 <tr>
                                     <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">No</th>
                                     <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Nama Karyawan</th>
-                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">NIP</th>
                                     <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Jam Masuk</th>
                                     <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Jam Pulang</th>
                                     <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Keterangan</th>
                                 </tr>
                             </thead>
                             <tbody class="bg-white divide-y divide-gray-200">
                                 @forelse ($attendances as $attendance)
                                     <tr>
-                                        <td class="px-6 py-4">{{ $loop->iteration + $attendances->firstItem() - 1 }}</td>
-                                        <td class="px-6 py-4 whitespace-nowrap">{{ $attendance->employee->user->name }}</td>
-                                        <td class="px-6 py-4 whitespace-nowrap">{{ $attendance->employee->nip }}</td>
-                                        <td class="px-6 py-4 whitespace-nowrap">{{ $attendance->time_in }}</td>
-                                        <td class="px-6 py-4 whitespace-nowrap">{{ $attendance->time_out ?? '-' }}</td>
-                                        <td class="px-6 py-4 whitespace-nowrap">
-                                            {{-- Logika badge status seperti di riwayat absensi --}}
-                                            @if ($attendance->status == 'Hadir')
-                                                <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-green-100 text-green-800">Hadir</span>
-                                            @elseif ($attendance->status == 'Terlambat')
-                                                <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-yellow-100 text-yellow-800">Terlambat</span>
-                                            @else
-                                                <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-red-100 text-red-800">{{ $attendance->status }}</span>
-                                            @endif
+                                        <td class="px-6 py-4">{{ $loop->iteration }}</td>
+                                        <td class="px-6 py-4 font-medium text-gray-900">{{ $attendance->employee->nama_lengkap ?? 'Karyawan Tidak Ditemukan' }}</td>
+                                        <td class="px-6 py-4">{{ $attendance->time_in ?? '--:--' }}</td>
+                                        <td class="px-6 py-4">{{ $attendance->time_out ?? '--:--' }}</td>
+                                        <td class="px-6 py-4">
+                                            {{-- Logika Badge Status --}}
+                                            @php
+                                                $status = $attendance->status;
+                                                $badgeColor = 'bg-gray-100 text-gray-800'; // Default
+                                                if (str_contains($status, 'Hadir')) $badgeColor = 'bg-green-100 text-green-800';
+                                                elseif (str_contains($status, 'Terlambat')) $badgeColor = 'bg-yellow-100 text-yellow-800';
+                                                elseif (str_contains($status, 'Izin')) $badgeColor = 'bg-blue-100 text-blue-800';
+                                                elseif (str_contains($status, 'Sakit')) $badgeColor = 'bg-orange-100 text-orange-800';
+                                                elseif (str_contains($status, 'Alpa')) $badgeColor = 'bg-red-100 text-red-800';
+                                            @endphp
+                                            <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full {{ $badgeColor }}">
+                                                {{ $status }}
+                                            </span>
                                         </td>
+                                        <td class="px-6 py-4 text-sm text-gray-500">{{ $attendance->notes }}</td>
                                     </tr>
                                 @empty
                                     <tr>
-                                        <td colspan="6" class="px-6 py-4 text-center text-gray-500">
-                                            Tidak ada data absensi untuk tanggal ini.
+                                        <td colspan="6" class="px-6 py-4 text-center text-sm text-gray-500">
+                                            Tidak ada data absensi untuk tanggal yang dipilih.
                                         </td>
                                     </tr>
                                 @endforelse
@@ -163,330 +172,55 @@ Isi file index.blade.php dengan kode lengkap berikut:
                         </table>
                     </div>
 
-                    <div class="mt-4">
-                        {{ $attendances->appends(request()->query())->links() }}
-                    </div>
                 </div>
             </div>
         </div>
     </div>
 </x-app-layout>
 ```
-Catatan Penting:
+Langkah 4: Menambahkan Link Navigasi untuk Admin
+Terakhir, agar admin bisa mengakses halaman ini, kita tambahkan link di menu navigasi.
 
-{{ $attendances->appends(request()->query())->links() }}: Ini sangat krusial. Perintah appends(request()->query()) memastikan bahwa ketika admin berpindah halaman (misal dari halaman 1 ke 2), parameter filter tanggal di URL akan tetap terbawa. Tanpa ini, filter akan ter-reset setiap kali pindah halaman.
+Buka file resources/views/layouts/navigation.blade.php. Cari bagian menu untuk admin dan tambahkan link baru.
 
-Langkah 31: Mengaktifkan Link Navigasi Admin
-Terakhir, kita aktifkan link menu "Laporan Absensi" untuk admin.
+```blade
+<div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+    <div class="flex justify-between h-16">
+        <div class="flex">
+            <div class="hidden space-x-8 sm:-my-px sm:ml-10 sm:flex">
+                @if(Auth::user()->role === 'admin')
+                    {{-- Navigasi untuk Admin --}}
+                    <x-nav-link :href="route('dashboard')" :active="request()->routeIs('dashboard')">
+                        {{ __('Dashboard') }}
+                    </x-nav-link>
+                    
+                    {{-- LINK BARU UNTUK LAPORAN --}}
+                    <x-nav-link :href="route('admin.reports.daily')" :active="request()->routeIs('admin.reports.daily')">
+                        {{ __('Laporan Harian') }}
+                    </x-nav-link>
 
-Buka resources/views/layouts/navigation.blade.php.
-
-Cari link "Laporan Absensi" dan aktifkan.
-
-Ubah ini (desktop & mobile):
-
-```HTML
-<x-nav-link :href="'#'" {{-- :href="route('reports.index')" :active="request()->routeIs('reports.*')" --}}>
-    {{ __('Laporan Absensi') }}
-</x-nav-link>
-```
-Menjadi:
-
-```HTML
-
-<x-nav-link :href="route('reports.index')" :active="request()->routeIs('reports.*')">
-    {{ __('Laporan Absensi') }}
-</x-nav-link>
-```
-(Lakukan hal yang sama untuk <x-responsive-nav-link>)
-
-Uji Coba
-Login sebagai admin.
-
-Klik menu "Laporan Absensi". Anda akan diarahkan ke halaman laporan.
-
-Secara default, halaman akan menampilkan data absensi untuk hari ini.
-
-Gunakan filter tanggal untuk memilih tanggal lain (misalnya kemarin atau lusa) lalu klik "Filter". Tabel akan diperbarui sesuai tanggal yang dipilih.
-
-Klik tombol "Reset" untuk kembali menampilkan data hari ini.
-
-Fitur laporan dasar untuk admin sekarang sudah selesai! Admin kini punya alat untuk memantau kehadiran karyawan setiap hari.
-
----
-
-Sistem absensi perlu tahu kapan hari libur nasional atau cuti bersama agar tidak salah menandai karyawan sebagai "Alpa". Untuk itu, kita akan membuat fitur Manajemen Hari Libur di mana admin bisa menambahkan dan menghapus tanggal-tanggal libur.
-
-## Tahap 11: Membuat CRUD Manajemen Hari Libur
-Ini akan menjadi fitur CRUD yang lebih sederhana, karena kita hanya butuh fungsi index (melihat daftar), store (menyimpan), dan destroy (menghapus).
-
-### Langkah 32: Membuat HolidayController
-Kita buat controller baru untuk mengelola semua logika terkait hari libur.
-
-Jalankan perintah ini di terminal:
-
-```Bash
-php artisan make:controller HolidayController --resource
-```
-Meskipun kita tidak akan menggunakan semua method resource, ini cara cepat untuk membuat controller dengan struktur standar.
-
-### Langkah 33: Membuat Rute untuk Hari Libur
-Kita definisikan rute yang diperlukan di dalam grup rute khusus admin.
-
-Buka file routes/web.php.
-
-Tambahkan rute berikut di dalam grup middleware(['auth', 'role:admin']).
-
-```PHP
-// routes/web.php
-use App\Http\Controllers\HolidayController; // <-- Jangan lupa tambahkan ini
-
-// ...
-
-Route::middleware(['auth', 'role:admin'])->group(function () {
-    Route::resource('users', UserController::class);
-    Route::get('/reports', [ReportController::class, 'index'])->name('reports.index');
-
-    // RUTE UNTUK HARI LIBUR
-    Route::get('/holidays', [HolidayController::class, 'index'])->name('holidays.index');
-    Route::post('/holidays', [HolidayController::class, 'store'])->name('holidays.store');
-    Route::delete('/holidays/{holiday}', [HolidayController::class, 'destroy'])->name('holidays.destroy');
-});
-
-// ...
-```
-Perhatikan kita hanya mendefinisikan rute yang kita butuhkan: index (GET), store (POST), dan destroy (DELETE).
-
-Langkah 34: Implementasi Logika di HolidayController
-Sekarang, kita isi HolidayController dengan logika untuk menampilkan, menyimpan, dan menghapus data.
-
-Buka app/Http/Controllers/HolidayController.php.
-
-Ganti seluruh isinya dengan kode berikut:
-
-```PHP
-
-<?php
-
-namespace App\Http\Controllers;
-
-use App\Models\Holiday; // <-- Import model
-use Illuminate\Http\Request;
-
-class HolidayController extends Controller
-{
-    /**
-     * Display a listing of the resource.
-     */
-    public function index()
-    {
-        // Ambil semua data hari libur, urutkan berdasarkan tanggal
-        $holidays = Holiday::orderBy('date', 'desc')->paginate(10);
-
-        return view('holidays.index', compact('holidays'));
-    }
-
-    /**
-     * Store a newly created resource in storage.
-     */
-    public function store(Request $request)
-    {
-        // Validasi input
-        $request->validate([
-            'date' => ['required', 'date', 'unique:holidays,date'],
-            'description' => ['required', 'string', 'max:255'],
-        ]);
-
-        // Buat data baru
-        Holiday::create([
-            'date' => $request->date,
-            'description' => $request->description,
-        ]);
-
-        return redirect()->route('holidays.index')
-                         ->with('success', 'Hari libur berhasil ditambahkan.');
-    }
-
-    /**
-     * Remove the specified resource from storage.
-     */
-    public function destroy(Holiday $holiday)
-    {
-        // Hapus data
-        $holiday->delete();
-
-        return redirect()->route('holidays.index')
-                         ->with('success', 'Hari libur berhasil dihapus.');
-    }
-}
-```
-Langkah 35: Membuat View Hari Libur
-Selanjutnya, kita buat halaman untuk menampilkan daftar hari libur sekaligus formulir untuk menambahkannya.
-
-Buat folder baru bernama holidays di dalam resources/views.
-
-Di dalam folder holidays, buat file baru bernama index.blade.php.
-
-Isi file tersebut dengan kode lengkap berikut:
-
-```HTML
-
-<x-app-layout>
-    <x-slot name="header">
-        <h2 class="font-semibold text-xl text-gray-800 leading-tight">
-            {{ __('Manajemen Hari Libur') }}
-        </h2>
-    </x-slot>
-
-    <div class="py-12">
-        <div class="max-w-7xl mx-auto sm:px-6 lg:px-8 space-y-6">
-
-            <div class="p-4 sm:p-8 bg-white shadow sm:rounded-lg">
-                <div class="max-w-xl">
-                    <header>
-                        <h2 class="text-lg font-medium text-gray-900">
-                            {{ __('Tambah Hari Libur Baru') }}
-                        </h2>
-                        <p class="mt-1 text-sm text-gray-600">
-                            {{ __('Tambahkan tanggal libur nasional atau cuti bersama.') }}
-                        </p>
-                    </header>
-
-                    @if ($errors->any())
-                        <div class="mt-4 bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative" role="alert">
-                            <ul>
-                                @foreach ($errors->all() as $error)
-                                    <li>{{ $error }}</li>
-                                @endforeach
-                            </ul>
-                        </div>
+                @elseif(Auth::user()->role === 'karyawan')
+                    {{-- Navigasi untuk Karyawan --}}
                     @endif
-
-                    <form method="post" action="{{ route('holidays.store') }}" class="mt-6 space-y-6">
-                        @csrf
-                        <div>
-                            <x-input-label for="date" :value="__('Tanggal')" />
-                            <x-text-input id="date" name="date" type="date" class="mt-1 block w-full" :value="old('date')" required />
-                        </div>
-                        <div>
-                            <x-input-label for="description" :value="__('Keterangan')" />
-                            <x-text-input id="description" name="description" type="text" class="mt-1 block w-full" :value="old('description')" required />
-                        </div>
-                        <div class="flex items-center gap-4">
-                            <x-primary-button>{{ __('Simpan') }}</x-primary-button>
-                        </div>
-                    </form>
-                </div>
-            </div>
-
-            <div class="p-4 sm:p-8 bg-white shadow sm:rounded-lg">
-                @if (session('success'))
-                    <div class="mb-4 bg-green-100 border border-green-400 text-green-700 px-4 py-3 rounded relative" role="alert">
-                        {{ session('success') }}
-                    </div>
-                @endif
-
-                <h3 class="text-lg font-medium text-gray-900 mb-4">Daftar Hari Libur</h3>
-                <div class="overflow-x-auto">
-                    <table class="min-w-full divide-y divide-gray-200">
-                        <thead class="bg-gray-50">
-                            <tr>
-                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Tanggal</th>
-                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Keterangan</th>
-                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Aksi</th>
-                            </tr>
-                        </thead>
-                        <tbody class="bg-white divide-y divide-gray-200">
-                            @forelse ($holidays as $holiday)
-                                <tr>
-                                    <td class="px-6 py-4 whitespace-nowrap">{{ \Carbon\Carbon::parse($holiday->date)->isoFormat('D MMMM Y') }}</td>
-                                    <td class="px-6 py-4 whitespace-nowrap">{{ $holiday->description }}</td>
-                                    <td class="px-6 py-4 whitespace-nowrap">
-                                        <form action="{{ route('holidays.destroy', $holiday->id) }}" method="POST" onsubmit="return confirm('Yakin ingin menghapus hari libur ini?');">
-                                            @csrf
-                                            @method('DELETE')
-                                            <button type="submit" class="text-red-600 hover:text-red-900">
-                                                <i class="fas fa-trash"></i> Hapus
-                                            </button>
-                                        </form>
-                                    </td>
-                                </tr>
-                            @empty
-                                <tr>
-                                    <td colspan="3" class="px-6 py-4 text-center text-gray-500">
-                                        Belum ada data hari libur.
-                                    </td>
-                                </tr>
-                            @endforelse
-                        </tbody>
-                    </table>
-                </div>
-                <div class="mt-4">
-                    {{ $holidays->links() }}
-                </div>
             </div>
         </div>
-    </div>
-</x-app-layout>
+        </div>
+</div>
 ```
-### Langkah 36: Mengaktifkan Link Navigasi Admin
-Langkah terakhir, aktifkan link "Hari Libur" di menu navigasi.
+Jangan lupa untuk menambahkan link yang sama di bagian Responsive Navigation Menu agar muncul di tampilan mobile.
 
-Buka resources/views/layouts/navigation.blade.php.
+## ✅ Uji Coba
+Login sebagai Admin.
 
-Cari link "Hari Libur" dan aktifkan rutenya.
+Di menu navigasi atas, akan muncul link baru "Laporan Harian". Klik link tersebut.
 
-Ubah ini (desktop & mobile):
+Anda akan diarahkan ke halaman laporan yang secara default menampilkan data absensi untuk hari ini.
 
-```HTML
-<x-nav-link :href="'#'" {{-- :href="route('holidays.index')" :active="request()->routeIs('holidays.*')" --}}>
-    {{ __('Hari Libur') }}
-</x-nav-link>
-```
-Menjadi:
+Gunakan filter tanggal untuk memilih hari kemarin atau tanggal lain, lalu klik "Tampilkan Laporan".
 
-```HTML
+Pastikan data yang muncul di tabel sudah sesuai dengan tanggal yang Anda pilih dan statusnya benar.
 
-<x-nav-link :href="route('holidays.index')" :active="request()->routeIs('holidays.*')">
-    {{ __('Hari Libur') }}
-</x-nav-link>
-```
 
-edit model holiday seperti ini :
-```php
-<?php
-
-namespace App\Models;
-
-use Illuminate\Database\Eloquent\Factories\HasFactory;
-use Illuminate\Database\Eloquent\Model;
-
-class Holiday extends Model
-{
-    use HasFactory;
-    protected $fillable = [
-        'date',
-        'description',
-    ];
-
-    protected $casts = [
-        'date' => 'date',
-    ];
-}
-
-```
-(Lakukan hal yang sama untuk <x-responsive-nav-link>)
-
-Uji Coba
-Login sebagai admin.
-
-Klik menu "Hari Libur". Anda akan diarahkan ke halaman manajemen hari libur.
-
-Coba tambahkan tanggal libur baru, misalnya "Hari Kemerdekaan", atau "ada libur khusus perusahaan".
-
-Tanggal yang baru ditambahkan akan muncul di tabel.
-
-Coba hapus data yang baru saja Anda buat.
 ---
 
 ### Next lanjut Part 4 untuk Integrasi Hari Libur ke Logika Absensi, mengimplementasikan sistem auto-generate absensi (status "Alpa") untuk karyawan yang tidak melakukan absensi pada hari kerja. Ini akan melibatkan Scheduled Task atau Tugas Terjadwal.
