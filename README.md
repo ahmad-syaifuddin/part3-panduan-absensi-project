@@ -344,7 +344,7 @@ Buka routes/web.php dan tambahkan rute ini di dalam grup middleware admin Anda:
 // routes/web.php
 use App\Http\Controllers\Admin\HolidayController;
 
-Route::middleware(['auth'])->group(function () { 
+Route::middleware(['auth', 'role:admin'])->group(function () {
     // ... rute admin lainnya ...
     
     // RUTE BARU UNTUK CRUD HARI LIBUR
