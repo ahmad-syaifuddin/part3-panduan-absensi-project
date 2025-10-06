@@ -561,6 +561,236 @@ Tambahkan data hari libur untuk hari ini.
 
 Kembali ke Dashboard Admin dan coba klik tombol "Proses & Tandai Karyawan Alpa". Seharusnya Anda akan mendapatkan pesan bahwa tidak ada tindakan yang diambil karena hari ini adalah hari libur.
 
+--- 
+
+Saat ini dashboard admin masih sangat standar. Kita akan mengubahnya menjadi pusat informasi yang menampilkan statistik kunci secara real-time, sehingga admin bisa mendapatkan gambaran cepat mengenai kondisi absensi hari ini.
+
+## Tahap 12: Upgrade Dashboard Admin dengan Statistik
+🎯 Tujuan:
+Menampilkan kartu statistik (total karyawan, hadir, terlambat, izin/sakit) dan daftar aktivitas absensi terbaru di halaman utama admin.
+
+Langkah 1: Memperbarui Logika di DashboardController
+Kita perlu mengambil semua data yang dibutuhkan dari database. Buka app/Http/Controllers/DashboardController.php dan modifikasi method index secara keseluruhan.
+
+```PHP
+<?php
+
+namespace App\Http\Controllers;
+
+use App\Models\Attendance;
+use App\Models\Employee; // <-- Tambahkan ini
+use Carbon\Carbon;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
+
+class DashboardController extends Controller
+{
+    public function index()
+    {
+        $user = Auth::user();
+
+        if ($user->role === 'admin') {
+            // Logika untuk Dashboard Admin
+            $today = Carbon::now('Asia/Makassar')->format('Y-m-d');
+
+            // 1. Statistik Kartu
+            $totalEmployees = Employee::where('status', 'aktif')->count();
+            $presentToday = Attendance::where('date', $today)->whereIn('status', ['Hadir', 'Terlambat'])->count();
+            $lateToday = Attendance::where('date', $today)->where('status', 'like', '%Terlambat%')->count();
+            $onLeaveToday = Attendance::where('date', $today)->whereIn('status', ['Izin', 'Sakit'])->count();
+
+            // 2. Aktivitas Terbaru
+            $recentActivities = Attendance::with('employee')
+                                ->where('date', $today)
+                                ->orderBy('created_at', 'desc')
+                                ->take(5)
+                                ->get();
+            
+            return view('dashboard-admin', compact(
+                'totalEmployees', 
+                'presentToday', 
+                'lateToday', 
+                'onLeaveToday',
+                'recentActivities'
+            ));
+
+        } elseif ($user->role === 'karyawan' && $user->employee) {
+            // Logika untuk Dashboard Karyawan (tetap sama)
+            $today = Carbon::now('Asia/Makassar')->format('Y-m-d');
+            $todaysAttendance = Attendance::where('employee_id', $user->employee->id)
+                                          ->where('date', $today)
+                                          ->first();
+            return view('dashboard-karyawan', compact('todaysAttendance'));
+        }
+
+        // Fallback jika karyawan tapi data employee belum ada
+        return view('dashboard-karyawan');
+    }
+}
+```
+Langkah 2: Mendesain Ulang Tampilan dashboard-admin.blade.php
+Sekarang kita gunakan data yang sudah disiapkan oleh controller untuk membangun tampilan dashboard yang informatif.
+
+Ganti seluruh isi file resources/views/dashboard-admin.blade.php dengan kode berikut:
+
+```Blade
+<x-app-layout>
+    <x-slot name="header">
+        <h2 class="font-semibold text-xl text-gray-800 leading-tight">
+            {{ __('Admin Dashboard') }}
+        </h2>
+    </x-slot>
+
+    <div class="py-12">
+        <div class="max-w-7xl mx-auto sm:px-6 lg:px-8">
+            {{-- Bagian Statistik Kartu --}}
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-6">
+                <div class="bg-white p-6 rounded-lg shadow-sm flex items-center space-x-4">
+                    <div class="bg-blue-500 p-3 rounded-full">
+                        <i class="fas fa-users text-white text-2xl"></i>
+                    </div>
+                    <div>
+                        <p class="text-sm text-gray-500">Total Karyawan Aktif</p>
+                        <p class="text-2xl font-bold">{{ $totalEmployees }}</p>
+                    </div>
+                </div>
+                <div class="bg-white p-6 rounded-lg shadow-sm flex items-center space-x-4">
+                    <div class="bg-green-500 p-3 rounded-full">
+                        <i class="fas fa-user-check text-white text-2xl"></i>
+                    </div>
+                    <div>
+                        <p class="text-sm text-gray-500">Hadir Hari Ini</p>
+                        <p class="text-2xl font-bold">{{ $presentToday }}</p>
+                    </div>
+                </div>
+                <div class="bg-white p-6 rounded-lg shadow-sm flex items-center space-x-4">
+                    <div class="bg-yellow-500 p-3 rounded-full">
+                        <i class="fas fa-user-clock text-white text-2xl"></i>
+                    </div>
+                    <div>
+                        <p class="text-sm text-gray-500">Terlambat Hari Ini</p>
+                        <p class="text-2xl font-bold">{{ $lateToday }}</p>
+                    </div>
+                </div>
+                <div class="bg-white p-6 rounded-lg shadow-sm flex items-center space-x-4">
+                    <div class="bg-orange-500 p-3 rounded-full">
+                        <i class="fas fa-user-times text-white text-2xl"></i>
+                    </div>
+                    <div>
+                        <p class="text-sm text-gray-500">Izin / Sakit Hari Ini</p>
+                        <p class="text-2xl font-bold">{{ $onLeaveToday }}</p>
+                    </div>
+                </div>
+            </div>
+
+            {{-- Bagian Aktivitas Terbaru & Aksi Cepat --}}
+            <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                <div class="lg:col-span-2 bg-white overflow-hidden shadow-sm sm:rounded-lg">
+                    <div class="p-6 text-gray-900">
+                        <h3 class="text-lg font-semibold mb-4">Aktivitas Absensi Terbaru Hari Ini</h3>
+                        <div class="space-y-4">
+                            @forelse ($recentActivities as $activity)
+                                <div class="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                                    <div>
+                                        <p class="font-semibold">{{ $activity->employee->nama_lengkap }}</p>
+                                        <p class="text-sm text-gray-500">
+                                            @if($activity->time_in && $activity->time_out)
+                                                Absen Pulang pada {{ $activity->time_out }}
+                                            @elseif($activity->time_in)
+                                                Absen Masuk pada {{ $activity->time_in }}
+                                            @else
+                                                Mengajukan {{ $activity->status }}
+                                            @endif
+                                        </p>
+                                    </div>
+                                    <div>
+                                        {{-- Badge Status --}}
+                                        @php
+                                            $status = $activity->status;
+                                            $badgeColor = 'bg-gray-100 text-gray-800'; // Default
+                                            if (str_contains($status, 'Hadir')) $badgeColor = 'bg-green-100 text-green-800';
+                                            elseif (str_contains($status, 'Terlambat')) $badgeColor = 'bg-yellow-100 text-yellow-800';
+                                            elseif (str_contains($status, 'Izin')) $badgeColor = 'bg-blue-100 text-blue-800';
+                                            elseif (str_contains($status, 'Sakit')) $badgeColor = 'bg-orange-100 text-orange-800';
+                                        @endphp
+                                        <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full {{ $badgeColor }}">
+                                            {{ $activity->status }}
+                                        </span>
+                                    </div>
+                                </div>
+                            @empty
+                                <p class="text-gray-500">Belum ada aktivitas absensi hari ini.</p>
+                            @endforelse
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="bg-white overflow-hidden shadow-sm sm:rounded-lg">
+                    <div class="p-6 text-gray-900">
+                        <h3 class="text-lg font-semibold mb-4">Aksi Cepat</h3>
+                        @php
+                            $currentTime = \Carbon\Carbon::now('Asia/Makassar');
+                            $endOfDay = $currentTime->copy()->setTime(14, 0, 0);
+                            $isPastOfficeHours = $currentTime->gt($endOfDay);
+                        @endphp
+
+                        @if ($isPastOfficeHours)
+                            <form action="{{ route('admin.attendance.mark_alpa') }}" method="POST" onsubmit="return confirm('Apakah Anda yakin?');">
+                                @csrf
+                                <button type="submit" class="w-full bg-red-600 hover:bg-red-800 text-white font-bold py-2 px-4 rounded-lg shadow-md">
+                                    <i class="fas fa-user-slash mr-2"></i>
+                                    Proses Karyawan Alpa
+                                </button>
+                                <p class="text-xs text-gray-500 mt-2 text-center">
+                                    Klik untuk menandai karyawan yang tidak absen hari ini sebagai "Alpa".
+                                </p>
+                            </form>
+                        @else
+                            <div class="bg-blue-100 border-l-4 border-blue-500 text-blue-700 p-4" role="alert">
+                                <p>Tombol "Proses Karyawan Alpa" akan aktif setelah jam 14:00 WITA.</p>
+                            </div>
+                        @endif
+                    </div>
+                </div>
+            </div>
+
+        </div>
+    </div>
+</x-app-layout>
+```
+Catatan Penting: Pastikan Anda sudah menambahkan Font Awesome di proyek Anda agar ikon-ikon (<i class="fas ..."></i>) bisa muncul. Jika belum, Anda bisa menambahkannya via CDN di file resources/views/layouts/app.blade.php di dalam tag <head>:
+
+```HTML
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.3/css/all.min.css" />
+```
+## ✅ Uji Coba
+Login sebagai Admin.
+
+Anda akan langsung disambut oleh halaman dashboard baru yang lebih hidup.
+
+Periksa apakah angka-angka di kartu statistik sudah benar. Cobalah login sebagai karyawan lain untuk absen masuk, lalu refresh dashboard admin, angkanya seharusnya berubah.
+
+Lihat bagian "Aktivitas Absensi Terbaru", pastikan data yang muncul adalah 5 aktivitas terakhir pada hari ini.
+
+Kotak "Aksi Cepat" akan tetap berfungsi seperti sebelumnya, menampilkan tombol atau pesan tergantung waktu.
+
+🎉 Selamat! Anda Telah Menyelesaikan Proyek Absensi!
+Anda telah berhasil membangun aplikasi absensi fungsional dari awal hingga akhir, mencakup:
+✅ Sisi Karyawan: Absen masuk/pulang, pengajuan izin/sakit, dan melihat riwayat.
+✅ Sisi Admin: Melihat laporan harian, mengelola hari libur, dan memonitor statistik di dashboard.
+
+Proyek ini adalah fondasi yang sangat kuat. Dari sini, Anda bisa mengembangkannya lebih jauh lagi dengan fitur-fitur seperti:
+
+Export laporan ke PDF/Excel untuk sisi admin.
+
+Laporan bulanan dan rekapitulasi.
+
+Sistem pengajuan cuti.
+
+Notifikasi via email atau WhatsApp.
+
+Teruslah belajar dan bereksperimen. Good luck!
+
 ---
 
 ### Next lanjut Part 4 untuk [Panduannya](https://github.com/ahmad-syaifuddin/part4-panduan-absensi-project.git).
