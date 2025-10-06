@@ -482,7 +482,7 @@ Login sebagai admin.
 
 Klik menu "Hari Libur". Anda akan diarahkan ke halaman manajemen hari libur.
 
-Coba tambahkan tanggal libur baru, misalnya "Hari Kemerdekaan".
+Coba tambahkan tanggal libur baru, misalnya "Hari Kemerdekaan", atau "ada libur khusus perusahaan".
 
 Tanggal yang baru ditambahkan akan muncul di tabel.
 
